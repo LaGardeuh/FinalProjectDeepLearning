@@ -1,0 +1,21 @@
+# Requirements pour le projet de prédiction de complétion de cours
+# Framework: TensorFlow
+# Python: 3.8+
+
+# Deep Learning
+tensorflow>=2.13.0
+keras>=2.13.0
+
+# Data manipulation et calcul scientifique
+numpy>=1.24.0
+pandas>=2.0.0
+
+# Machine Learning
+scikit-learn>=1.3.0
+
+# Visualisation
+matplotlib>=3.7.0
+seaborn>=0.12.0
+
+# Utilitaires
+tqdm>=4.65.0
