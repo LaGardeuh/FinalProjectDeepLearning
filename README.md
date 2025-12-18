@@ -1,8 +1,5 @@
-# Prédiction de Complétion de Cours - TensorFlow
-
 ## Description du Projet
 
-Ce projet implémente un réseau de neurones profond (Deep Neural Network) multi-tâches utilisant **TensorFlow/Keras** pour prédire la complétion de cours en ligne. Le modèle résout simultanément :
 
 1. **Régression multi-sorties** : Prédire 4 variables continues
    - `Project_Grade` : Note du projet (0-100)
@@ -11,144 +8,212 @@ Ce projet implémente un réseau de neurones profond (Deep Neural Network) multi
    - `Satisfaction_Rating` : Note de satisfaction (1-5)
 
 2. **Classification binaire** : Prédire si l'étudiant complète le cours
-   - `Completed` : Oui (1) / Non (0)
+   - `Completed` : 1 (Completed) / 0 (Not Completed)
 
 ## Architecture du Modèle
 
-### Architecture Multi-Tâches (Multi-Task Learning)
+### Modèle de Régression Multi-Sorties
 
 ```
 Input (n_features)
     ↓
-[Shared Layers] - Tronc commun
-    ├─ Dense(256) + BatchNorm + Dropout
-    ├─ Dense(128) + BatchNorm + Dropout
-    ├─ Dense(64) + BatchNorm + Dropout
-    └─ Dense(32) + BatchNorm + Dropout
+Dense(256) + BatchNorm + Dropout(0.3) + L2(0.001)
     ↓
-    ├─────────────────┬─────────────────┐
-    ↓                 ↓                 ↓
-[Regression Branch] [Classification Branch]
-    ↓                 ↓
-Dense(64,32)     Dense(64,32)
-    ↓                 ↓
-Output(4)        Output(1)
-sigmoid          sigmoid
+Dense(128) + BatchNorm + Dropout(0.3) + L2(0.001)
+    ↓
+Dense(64) + BatchNorm + Dropout(0.2) + L2(0.001)
+    ↓
+Dense(32) + BatchNorm + Dropout(0.2) + L2(0.001)
+    ↓
+Output(4) - Linear activation
 ```
+
+**Paramètres totaux** : ~93,000 paramètres
+
+### Modèle de Classification Binaire
+
+```
+Input (n_features)
+    ↓
+Dense(256) + BatchNorm + Dropout(0.4) + L2(0.001)
+    ↓
+Dense(128) + BatchNorm + Dropout(0.4) + L2(0.001)
+    ↓
+Dense(64) + BatchNorm + Dropout(0.3) + L2(0.001)
+    ↓
+Dense(32) + BatchNorm + Dropout(0.3) + L2(0.001)
+    ↓
+Output(1) - Sigmoid activation
+```
+
+**Paramètres totaux** : ~89,000 paramètres
 
 ### Caractéristiques Techniques
 
-- **Activation** : ReLU pour les couches cachées, Sigmoid pour les sorties
+- **Activation** : ReLU pour les couches cachées
+- **Initialisation** : He Normal (adapté pour ReLU)
 - **Régularisation** : 
-  - Dropout (30%)
-  - L2 Regularization (0.001)
-  - Batch Normalization
+  - Dropout progressif (0.4 → 0.3 → 0.2)
+  - L2 Regularization (λ = 0.001)
+  - Batch Normalization après chaque couche
 - **Optimiseur** : Adam (learning rate = 0.001)
 - **Loss Functions** :
   - Régression : Mean Squared Error (MSE)
   - Classification : Binary Cross-Entropy
 - **Callbacks** :
-  - Early Stopping (patience=15)
-  - Reduce Learning Rate on Plateau (patience=10)
+  - Early Stopping (patience=30 pour régression, 30 pour classification)
+  - Reduce Learning Rate on Plateau (factor=0.5, patience=10/15)
   - Model Checkpoint (sauvegarde du meilleur modèle)
-
-## Structure du Projet
-
-```
-course-completion-prediction/
-│
-├── config.py                 # Configuration et constantes
-├── preprocessing.py          # Prétraitement des données
-├── model_tensorflow.py       # Modèle TensorFlow/Keras
-├── evaluation.py             # Évaluation et visualisation
-├── main.py                   # Script principal
-├── requirements.txt          # Dépendances Python
-├── README.md                 # Documentation
-│
-├── data/
-│   └── Course_Completion_Prediction.csv
-│
-└── outputs/
-    ├── models/               # Modèles sauvegardés
-    ├── plots/                # Graphiques générés
-    └── metrics_report_*.txt  # Rapports d'évaluation
-```
 
 ## Installation et Utilisation
 
 ### 1. Prérequis
 
 - Python 3.8 ou supérieur
+- TensorFlow 2.x
 - pip
 
 ### 2. Installation des dépendances
 
 ```bash
-pip install -r requirements.txt
+pip install tensorflow pandas numpy scikit-learn matplotlib seaborn
 ```
 
 ### 3. Exécution du pipeline complet
 
 ```bash
-python main.py
+python model_tensorflow.py
 ```
 
-### Options de ligne de commande
-
-```bash
-# Avec des paramètres personnalisés
-python main.py --epochs 150 --batch-size 256 --data-path /chemin/vers/data.csv
-```
+Le script exécute automatiquement :
+1. Prétraitement des données
+2. Entraînement du modèle de régression
+3. Entraînement du modèle de classification
+4. Évaluation complète sur le test set
+5. Génération des visualisations
 
 ## Pipeline de Données
 
-### 1. Prétraitement
+### 1. Prétraitement (load_and_preprocess_data)
 
-Le module `preprocessing.py` effectue :
+**Étapes effectuées** :
 
-- **Vérification de qualité** : Détection des valeurs manquantes et doublons
-- **Encodage** : LabelEncoder pour les variables catégorielles
-- **Normalisation** : 
-  - StandardScaler pour les features
-  - Min-Max normalization (0-1) pour les targets de régression
-- **Split** : 80% train / 20% test avec stratification
+#### a) Feature Engineering (11 nouvelles features créées)
 
-### 2. Features Utilisées
+**Features temporelles (4)** :
+- `Enrollment_Month` : Mois d'inscription (1-12)
+- `Enrollment_DayOfWeek` : Jour de la semaine (0-6)
+- `Enrollment_Quarter` : Trimestre (1-4)
+- `Days_Since_Enrollment` : Ancienneté en jours
 
-**Variables numériques** (19 features) :
-- Démographiques : Age
-- Cours : Course_Duration_Days, Instructor_Rating
-- Engagement : Login_Frequency, Average_Session_Duration_Min, Video_Completion_Rate
-- Interaction : Discussion_Participation, Peer_Interaction_Score
-- Activité : Time_Spent_Hours, Days_Since_Last_Login, Rewatch_Count
-- Performance : Quiz_Attempts, Assignments_Missed
-- Paiement : Payment_Amount, App_Usage_Percentage
-- Support : Reminder_Emails_Clicked, Support_Tickets_Raised, Notifications_Checked
+**Features d'engagement (3)** :
+- `Assignment_Completion_Rate` : Taux de complétion des devoirs (%)
+- `Activity_Score` : Score d'activité global
+- `Quiz_Engagement` : Engagement avec les quiz
 
-**Variables catégorielles** (12 features) :
+**Features de ressources (2)** :
+- `Hours_Per_Session` : Heures moyennes par session
+- `Usage_Intensity` : Intensité d'utilisation du cours
+
+**Features d'interaction (2)** :
+- `Social_Engagement` : Engagement social (discussions × interactions)
+- `Notification_Response_Rate` : Taux de réponse aux notifications
+
+#### b) Traitement des valeurs manquantes
+- Méthode automatique selon le type :
+  - Numériques : Remplacement par la **médiane**
+  - Catégorielles : Remplacement par le **mode**
+
+#### c) Encodage des variables catégorielles
+
+**Stratégie adaptative** :
+- **One-Hot Encoding** : Variables avec ≤ 10 catégories (drop_first=True)
+- **Label Encoding** : Variables avec > 10 catégories
+
+**Variables encodées** :
 - Gender, Education_Level, Employment_Status
-- City, Device_Type, Internet_Connection_Quality
-- Course_Name, Category, Course_Level
+- Device_Type, Internet_Connection_Quality
+- Category, Course_Level
 - Payment_Mode, Fee_Paid, Discount_Used
+- City (Label Encoded car >10 valeurs)
+- Course_Name (Label Encoded car >10 valeurs)
 
-**Total : 31 features**
+#### d) Séparation des données
 
-### 3. Variables Exclues
+**Split stratifié (basé sur la cible de classification)** :
+- **Train** : 70% (70,000 exemples)
+- **Validation** : 15% (15,000 exemples)
+- **Test** : 15% (15,000 exemples)
 
-- Student_ID, Name (identifiants)
-- Course_ID, Enrollment_Date (métadonnées)
-- Assignments_Submitted (risque de data leakage)
+**Avantage** : Garantit la même distribution des classes dans chaque ensemble
+
+#### e) Normalisation
+
+- **StandardScaler** : Centre les données (mean=0, std=1)
+- Appliqué sur les features uniquement
+- Fit sur train, transform sur val/test (évite le data leakage)
+
+### 2. Variables du Dataset
+
+**Features d'origine** : ~34 features après encodage
+
+**Variables exclues** :
+- `Student_ID`, `Name` : Identifiants
+- `Enrollment_Date` : Transformée en features temporelles
 - Les 5 variables cibles
 
-## 📈 Évaluation
+**Variables cibles** :
+- 4 cibles de régression continues
+- 1 cible de classification binaire
+
+## Modèles
+
+### Régression Multi-Sorties (build_regression_model)
+
+**Architecture** : [256 → 128 → 64 → 32 → 4]
+
+**Caractéristiques** :
+- Dropout progressif : 0.3 → 0.3 → 0.2 → 0.2
+- L2 regularization : 0.001 pour toutes les couches
+- Activation finale : **Linear** (régression)
+- Loss : **MSE** (Mean Squared Error)
+- Métriques : MAE, MSE
+
+**Entraînement** :
+- Epochs max : 200
+- Batch size : 64
+- Early stopping : patience=20
+- Reduce LR : factor=0.5, patience=10
+
+### Classification Binaire (build_classification_model)
+
+**Architecture** : [256 → 128 → 64 → 32 → 1]
+
+**Caractéristiques** :
+- Dropout progressif : 0.4 → 0.4 → 0.3 → 0.3 (plus élevé)
+- L2 regularization : 0.001
+- Activation finale : **Sigmoid** (probabilités)
+- Loss : **Binary Crossentropy**
+- Métriques : Accuracy, Precision, Recall, AUC
+
+**Entraînement** :
+- Epochs max : 300
+- Batch size : 32 (plus petit pour meilleure généralisation)
+- Class weights : Calculés automatiquement avec `compute_class_weight`
+- Early stopping : patience=30, monitor='val_auc'
+- Reduce LR : factor=0.5, patience=10
+
+## Évaluation
 
 ### Métriques de Régression
 
-Pour chaque target :
-- **MAE** (Mean Absolute Error)
-- **MSE** (Mean Squared Error)
-- **RMSE** (Root Mean Squared Error)
-- **R²** (Coefficient de détermination)
+Pour chaque cible (Project_Grade, Quiz_Score_Avg, Progress_Percentage, Satisfaction_Rating) :
+- **MAE** (Mean Absolute Error) : Erreur absolue moyenne
+- **MSE** (Mean Squared Error) : Erreur quadratique moyenne
+- **RMSE** (Root Mean Squared Error) : Racine de MSE
+- **R²** (Coefficient de détermination) : Qualité de l'ajustement (0-1)
+
+**Rapport généré** : `results.csv` avec métriques par cible
 
 ### Métriques de Classification
 
@@ -156,135 +221,162 @@ Pour chaque target :
 - **Precision** : Proportion de vrais positifs parmi les positifs prédits
 - **Recall** : Proportion de vrais positifs identifiés
 - **F1-Score** : Moyenne harmonique de Precision et Recall
-- **AUC-ROC** : Aire sous la courbe ROC
+- **AUC-ROC** : Aire sous la courbe ROC (0.5 = hasard, 1.0 = parfait)
+
+**Matrice de confusion** :
+```
+           Prédiction
+           0     1
+Réel  0   TN    FP
+      1   FN    TP
+```
 
 ### Visualisations Générées
 
-1. **training_history.png** : Courbes d'apprentissage (loss, métriques)
-2. **regression_predictions.png** : Scatter plots prédictions vs réalité
-3. **regression_residuals.png** : Analyse des résidus
-4. **classification_results.png** : Matrice de confusion, courbe ROC, distribution des probabilités
+**Régression** :
+1. `training_curves.png` : Loss et MAE (train/val)
 
-## 🎯 Justifications des Choix Techniques
+**Classification** :
+1. `training_curves.png` : Loss et AUC (train/val)
+2. `roc_curve.png` : Courbe ROC avec AUC
 
-### Pourquoi un Modèle Multi-Tâches ?
+## Justifications des Choix Techniques
 
-1. **Partage de représentations** : Les features communes (engagement, démographie) sont pertinentes pour les deux tâches
-2. **Régularisation implicite** : L'apprentissage simultané réduit le surapprentissage
-3. **Efficacité** : Un seul modèle au lieu de 5 modèles séparés
-4. **Cohérence** : Les prédictions sont liées (un étudiant avec de bonnes notes a plus de chances de compléter)
+### 1. Architecture Progressive
 
-### Architecture en Détail
+**Choix** : [256 → 128 → 64 → 32]
 
-**Tronc commun (4 couches)** :
-- Extrait des features générales utiles aux deux tâches
-- Profondeur suffisante pour capturer des patterns complexes
-- BatchNorm stabilise l'apprentissage
-- Dropout évite le surapprentissage
+**Justification** :
+- Réduction progressive permet extraction hiérarchique de features
+- 256 neurones au début : capacité suffisante pour patterns complexes
+- 32 à la fin : features condensées et abstraites
+- 4 couches : profondeur équilibrée (ni sous-ajustement, ni surapprentissage)
 
-**Branches spécialisées (2 couches chacune)** :
-- Permet d'apprendre des features spécifiques à chaque tâche
-- Couches plus petites (64→32) car elles affinent les représentations
+### 2. Batch Normalization
 
-**Activations** :
-- ReLU : Standard pour les couches cachées, évite le gradient vanishing
-- Sigmoid (sorties) : Approprié pour régression normalisée [0,1] et classification binaire
+**Avantages** :
+- Stabilise l'apprentissage
+- Permet des learning rates plus élevés
+- Agit comme régularisateur
+- Accélère la convergence
 
-### Hyperparamètres
+**Placement** : Après chaque couche Dense, avant Dropout
 
-**Choix du Learning Rate (0.001)** :
+### 3. Dropout Progressif
+
+**Régression** : 0.3 → 0.3 → 0.2 → 0.2  
+**Classification** : 0.4 → 0.4 → 0.3 → 0.3
+
+**Justification** :
+- Plus élevé en début : évite co-adaptation des neurones
+- Plus faible en fin : préserve les représentations finales
+- Classification > Régression : plus sujet au surapprentissage
+
+### 4. Régularisation L2 (0.001)
+
+**Avantages** :
+- Pénalise les poids élevés
+- Encourage des modèles plus généralisables
+- λ=0.001 : bon compromis (ni sous-ajustement, ni sous-régularisation)
+
+### 5. Hyperparamètres
+
+**Learning Rate (0.001)** :
 - Valeur standard pour Adam
-- Équilibre entre vitesse de convergence et stabilité
-- ReduceLROnPlateau ajuste automatiquement si nécessaire
+- Suffisamment petit pour convergence stable
+- ReduceLROnPlateau ajuste si nécessaire
 
-**Dropout (30%)** :
-- Taux modéré pour réseau profond
-- Prévient le co-adaptation des neurones
-- Balance régularisation et capacité d'apprentissage
+**Batch Size** :
+- Régression : 64 (bon compromis performance/mémoire)
+- Classification : 32 (meilleure généralisation avec déséquilibre)
 
-**Batch Size (128)** :
-- Compromis entre :
-  - Stabilité du gradient (batches plus grands)
-  - Généralisation (batches plus petits)
-  - Performance computationnelle
+**Epochs** :
+- Régression : 200 (Early Stopping évite le surapprentissage)
+- Classification : 300 (plus complexe, besoin de plus de temps)
 
-**Early Stopping (patience=15)** :
-- 15 époques sans amélioration avant arrêt
-- Empêche le surapprentissage
-- Économise du temps de calcul
+**Patience** :
+- Régression : 20 epochs
+- Classification : 30 epochs (plus tolérant aux fluctuations)
 
-### Normalisation des Données
+### 6. Gestion du Déséquilibre des Classes
 
-**StandardScaler pour les features** :
-- Centre les données (moyenne=0, variance=1)
-- Crucial pour la convergence des réseaux de neurones
+**Méthode** : Class weights automatiques
+
+```python
+class_weights = compute_class_weight(
+    class_weight='balanced',
+    classes=[0, 1],
+    y=y_train
+)
+```
+
+**Effet** :
+- Pénalise davantage les erreurs sur la classe minoritaire
+- Force le modèle à apprendre les deux classes équitablement
+- Alternative à SMOTE (plus simple et efficace)
+
+### 7. Feature Engineering
+
+**Pourquoi créer 11 nouvelles features ?**
+
+1. **Ratios et taux** : Capturent l'efficacité (ex: Assignment_Completion_Rate)
+2. **Interactions** : Relations entre variables (ex: Social_Engagement)
+3. **Temporel** : Saisonnalité et patterns temporels
+4. **Agrégations** : Scores globaux (ex: Activity_Score)
+
+**Impact** : Améliore significativement R² et AUC-ROC
+
+### 8. Normalisation StandardScaler
+
+**Avantages** :
+- Centre les données (mean=0)
+- Même échelle (std=1)
+- Essentiel pour convergence des réseaux de neurones
 - Évite que certaines features dominent
 
-**Min-Max [0,1] pour les targets de régression** :
-- Facilite l'apprentissage avec activation sigmoid
-- Homogénéise les échelles différentes (0-100 vs 1-5)
-- Améliore la stabilité numérique
+**Alternative** : MinMaxScaler (non utilisé car moins robuste aux outliers)
 
-## 🔧 Code de Qualité
+## Code de Qualité
 
-### Standards Respectés
+### Bonnes Pratiques Implémentées
 
-- **PEP-8** : Formatage du code Python
-- **Type hints** : Annotations de types pour clarté
-- **Docstrings** : Documentation complète de chaque fonction/classe
-- **Modularité** : Séparation en modules logiques
-- **Commentaires** : Explications des choix techniques
-
-### Bonnes Pratiques
-
-- Gestion des erreurs
-- Logging informatif
-- Reproductibilité (random_state=42)
+- Logging informatif (print statements détaillés)
+- Reproductibilité (RANDOM_STATE=42)
 - Séparation train/validation/test
-- Callbacks pour monitoring
+- Sauvegarde automatique des modèles
 
-## 📝 Résultats Attendus
 
-Le modèle génère automatiquement :
 
-1. **Modèles sauvegardés** :
-   - `best_model_tensorflow.h5` : Meilleur modèle pendant l'entraînement
-   - `final_model_tensorflow.h5` : Modèle final
+## Résultats Attendus
 
-2. **Rapport de métriques** :
-   - Fichier texte avec toutes les métriques
-   - Configuration du modèle
-   - Timestamp
+### Fichiers Générés
 
-3. **Visualisations** :
-   - 4 graphiques PNG détaillés
-   - Haute résolution (DPI=100)
+**Données prétraitées** :
+- `X_train.npy`, `X_val.npy`, `X_test.npy` : Features normalisées
+- `y_reg_*.npy` : Cibles de régression
+- `y_cls_*.npy` : Cibles de classification
+- `scaler.pkl` : Scaler pour production
+- `feature_names.pkl` : Noms des features
+- `config.pkl` : Configuration complète
 
-## 🎓 Contexte Académique
+**Modèles de régression** :
+- `final_model.keras` : Modèle final
+- `best_model.keras` : Meilleur modèle (val_loss)
+- `results.csv` : Métriques par cible
+- `training_curves.png` : Visualisations
 
-**Projet** : Implémentation de réseaux de neurones pour régression + classification  
-**Framework** : TensorFlow/Keras  
-**Date** : Décembre 2024  
+**Modèles de classification** :
+- `final_model.keras` : Modèle final
+- `best_model.keras` : Meilleur modèle (val_auc)
+- `results.pkl` : Métriques
+- `training_curves.png` : Loss et AUC
+- `roc_curve.png` : Courbe ROC
+
+## Contexte Académique
+
+**Projet** : Implémentation de réseaux de neurones pour prédiction de complétion de cours  
 **Objectifs** :
-- ✅ Implémentation d'un MLP/DNN avec TensorFlow
-- ✅ Prétraitement rigoureux des données
-- ✅ Évaluation et optimisation des modèles
-- ✅ Code de qualité, documenté et modulaire
-- ✅ Justification de toutes les décisions techniques
+- Implémentation d'un DNN multi-sorties
+- Prétraitement rigoureux avec feature engineering
+- Évaluation complète avec métriques appropriées
 
-## 📚 Références
-
-- [TensorFlow Documentation](https://www.tensorflow.org/api_docs)
-- [Keras Guide](https://keras.io/guides/)
-- [Multi-Task Learning](https://en.wikipedia.org/wiki/Multi-task_learning)
-- [Deep Learning Book](https://www.deeplearningbook.org/)
-
-## 👤 Auteur
-
-**Keralo**  
-Étudiant en Computer Science/Engineering - ESAIP  
-Spécialisation : Intelligence Artificielle
-
----
-
-*Ce projet démontre une compréhension approfondie des réseaux de neurones, du prétraitement de données, et des bonnes pratiques de développement en Deep Learning.*
