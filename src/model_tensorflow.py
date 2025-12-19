@@ -202,7 +202,6 @@ def load_and_preprocess_data(filepath):
     )
     print("'Completed' → 1, 'Not Completed' → 0")
 
-    # ========================================================================
     print("\n" + "=" * 80)
     print(" ÉTAPE 5: SÉPARATION DES DONNÉES")
     print("=" * 80)
@@ -242,7 +241,6 @@ def load_and_preprocess_data(filepath):
     print(f"Val:   {len(X_val):,} ({len(X_val) / len(X) * 100:.1f}%)")
     print(f"Test:  {len(X_test):,} ({len(X_test) / len(X) * 100:.1f}%)")
 
-    # ========================================================================
     print("\n" + "=" * 80)
     print(" ÉTAPE 6: NORMALISATION")
     print("=" * 80)
@@ -256,7 +254,6 @@ def load_and_preprocess_data(filepath):
     print(f"Moyenne (train): {X_train_scaled.mean():.6f}")
     print(f"Écart-type (train): {X_train_scaled.std():.6f}")
 
-    # ========================================================================
     print("\n" + "=" * 80)
     print(" ÉTAPE 7: SAUVEGARDE")
     print("=" * 80)
@@ -321,12 +318,12 @@ def load_and_preprocess_data(filepath):
     }
 
 
-# ============================================================================
-# SECTION 3: MODÈLE DE RÉGRESSION MULTI-SORTIES
-# ============================================================================
+
+#MODÈLE DE RÉGRESSION MULTI-SORTIES
+
 
 def build_regression_model(input_dim, n_outputs,
-                           hidden_layers=[256, 128, 64, 32],
+                           hidden_layers=[256, 128, 64],
                            dropout_rate=0.3,
                            l2_reg=0.001,
                            learning_rate=0.001):
@@ -448,7 +445,7 @@ def train_regression_model(data):
     history = model.fit(
         X_train, y_reg_train,
         validation_data=(X_val, y_reg_val),
-        epochs=200,
+        epochs=70,
         batch_size=64,
         callbacks=callback_list,
         verbose=0
@@ -530,8 +527,8 @@ def train_regression_model(data):
 # ============================================================================
 
 def build_classification_model(input_dim,
-                               hidden_layers=[512, 256, 128, 64, 32],
-                               dropout_rate=0.5,
+                               hidden_layers=[256, 128, 64],
+                               dropout_rate=0.3,
                                l2_reg=0.001,
                                learning_rate=0.001):
     """
@@ -673,7 +670,7 @@ def train_classification_model(data):
     history = model.fit(
         X_train, y_cls_train,
         validation_data=(X_val, y_cls_val),
-        epochs=300,
+        epochs=70,
         batch_size=32,
         class_weight=class_weights,
         callbacks=callback_list,
